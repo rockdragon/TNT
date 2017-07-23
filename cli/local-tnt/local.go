@@ -250,6 +250,6 @@ func main() {
 			return
 		}
 
-		handleConn(conn)
+		go handleConn(conn)
 	}
 }
