@@ -82,13 +82,24 @@ func extractRequest(conn *tnt.Conn) (host string, err error) {
 func handleConn(conn *tnt.Conn) {
 	defer conn.Close()
 
+	// 1. extract host info
 	host, err := extractRequest(conn)
 	if err != nil {
 		log.Println("Extract Request Error", err)
 		return
 	}
-
 	log.Println("[HOST]", host)
+
+	// 2. request to the remote
+	remote, err := net.Dial(network, host)
+	if err != nil {
+		log.Println("Request Remote Error", err)
+		return
+	}
+	defer remote.Close()
+
+	go tnt.Pipe(conn, remote)
+	tnt.Pipe(remote, conn)
 }
 
 func main() {

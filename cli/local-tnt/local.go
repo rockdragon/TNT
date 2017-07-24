@@ -221,8 +221,8 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	}
 	defer remote.Close()
 
-	// go tnt.Pipe(conn, remote)
-	// tnt.Pipe(remote, conn)
+	go tnt.Pipe(conn, remote)
+	tnt.Pipe(remote, conn)
 
 	return
 }
