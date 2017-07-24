@@ -26,11 +26,11 @@ func Pipe(src, dst net.Conn) {
 	buf := make([]byte, maxNBuf)
 	for {
 		setReadTimeout(src)
-		log.Println("CHUNK...")
+		// log.Println("CHUNK...")
 		n, err := src.Read(buf)
-		log.Println("PIPE DATA: ", n, err)
+		// log.Println("PIPE DATA: ", n, err)
 		if n > 0 {
-			if _, err = dst.Write(buf); err != nil {
+			if _, err = dst.Write(buf[0:n]); err != nil {
 				log.Println("[PIPE DATA ERROR]", err)
 				break
 			}
@@ -38,7 +38,7 @@ func Pipe(src, dst net.Conn) {
 		if err != nil {
 			break
 		}
-		log.Println("FIN")
+		// log.Println("FIN")
 	}
 }
 

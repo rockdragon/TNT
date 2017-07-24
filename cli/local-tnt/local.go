@@ -41,8 +41,6 @@ const (
 	lenDmBase  = 3 + 1 + 1 + 2           // 3 + 1addrType + 1addrLen + 2port, plus addrLen
 )
 
-var cipher *tnt.Cipher
-
 func init() {
 	rand.Seed(time.Now().Unix())
 }
@@ -188,7 +186,7 @@ func sendHTTPRequest(addr string, rawdata []byte) (conn net.Conn, err error) {
 }
 
 // rountine of per connection
-func handleConn(conn net.Conn) {
+func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	defer conn.Close()
 
 	// https://www.ietf.org/rfc/rfc1928.txt
@@ -223,33 +221,35 @@ func handleConn(conn net.Conn) {
 	}
 	defer remote.Close()
 
-	go tnt.Pipe(conn, remote)
-	tnt.Pipe(remote, conn)
+	// go tnt.Pipe(conn, remote)
+	// tnt.Pipe(remote, conn)
 
 	return
 }
 
 func main() {
-	var err error
-	cipher, err = tnt.NewCipher(method, password)
-	if err != nil {
-		log.Println("Create Cipher Error", err)
-		os.Exit(1)
-	}
-
 	log.Println("Server is Listening:", network, laddr)
 	ln, err := net.Listen(network, laddr)
 	if err != nil {
 		log.Println("Listen Error", err)
 		os.Exit(1)
 	}
+	var cipher *tnt.Cipher
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			log.Printf("Accept Rrror: %v\n", err)
 			return
 		}
+		if cipher == nil {
+			cipher, err = tnt.NewCipher(method, password)
+			if err != nil {
+				log.Println("Generate Cipher Error", err)
+				conn.Close()
+				continue
+			}
+		}
 
-		go handleConn(conn)
+		go handleConn(conn, cipher.Copy())
 	}
 }
