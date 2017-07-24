@@ -14,7 +14,7 @@ import (
 
 const (
 	network    = "tcp"
-	raddr      = "127.0.0.1:10086"
+	raddr      = ":10086"
 	password   = "$RGB&*()$RGN!@#$"
 	method     = "chacha20"
 	requestBuf = 269
