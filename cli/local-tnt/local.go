@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -39,6 +40,10 @@ const (
 	lenIPv4    = 3 + 1 + net.IPv4len + 2 // 3(ver+cmd+rsv) + 1addrType + ipv4 + 2port
 	lenIPv6    = 3 + 1 + net.IPv6len + 2 // 3(ver+cmd+rsv) + 1addrType + ipv6 + 2port
 	lenDmBase  = 3 + 1 + 1 + 2           // 3 + 1addrType + 1addrLen + 2port, plus addrLen
+)
+
+var (
+	serverAddr = flag.String("s", raddr, "server addr")
 )
 
 func init() {
@@ -107,7 +112,7 @@ func extractRequest(conn net.Conn) (socksReq *tnt.Socks5Request, err error) {
 	}
 	command := uint8(buf[layoutCommand])
 	if command != CONNECT {
-		err = errors.New("only CONNECT be able to accept!")
+		err = errors.New("only CONNECT be able to accept")
 		return
 	}
 	RSV := uint8(buf[layoutRSV])
@@ -214,7 +219,7 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	replyRequest(conn, socksRequest)
 
 	// 5. connect to remote
-	remote, err := tnt.ConnectToServer(network, raddr, socksRequest.RawAddr, cipher)
+	remote, err := tnt.ConnectToServer(network, *serverAddr, socksRequest.RawAddr, cipher)
 	if err != nil {
 		log.Println("Connect to server failed", err)
 		return
@@ -228,6 +233,8 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 }
 
 func main() {
+	flag.Parse()
+
 	log.Println("Server is Listening:", network, laddr)
 	ln, err := net.Listen(network, laddr)
 	if err != nil {

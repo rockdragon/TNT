@@ -35,7 +35,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	n, err = c.Conn.Read(buf)
 	if n > 0 {
 		c.decrypt(b[:n], buf[:n])
-		log.Printf("[DEC] %d %v -> %v [IV] %v \n", n, buf, b, c.iv)
+		log.Printf("[DEC] %d %v -> %v [IV] %v \n", n, buf[:n], b[:n], c.iv)
 	}
 	return
 }
