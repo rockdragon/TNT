@@ -128,6 +128,8 @@ func (c *Cipher) initEncrpyt() (iv []byte, err error) {
 			return nil, err
 		}
 		c.iv = iv
+	} else {
+		iv = c.iv
 	}
 	c.enc, err = c.info.newStream(c.key, iv, Encrypt)
 	return
