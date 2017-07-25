@@ -61,7 +61,7 @@ func reply(conn net.Conn, bytes []byte) (err error) {
 // |VER | NMETHODS | METHODS  |
 // +----+----------+----------+
 // | 1  |    1     | 1 to 255 |
-func extractNeogotiation(conn net.Conn) (socks *tnt.Socks5Negotiation, err error) {
+func extractNegotiation(conn net.Conn) (socks *tnt.Socks5Negotiation, err error) {
 	buf := make([]byte, requestBuf)
 
 	if _, err = io.ReadFull(conn, buf[:layoutNofMethods+1]); err != nil {
@@ -197,7 +197,7 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	// https://www.ietf.org/rfc/rfc1928.txt
 
 	// 1. extract info about negotiation
-	socks, err := extractNeogotiation(conn)
+	socks, err := extractNegotiation(conn)
 	if err != nil {
 		log.Println("[Negotiate REQ Error]", err)
 		return
@@ -245,7 +245,7 @@ func main() {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Printf("Accept Rrror: %v\n", err)
+			log.Printf("Accept Error: %v\n", err)
 			return
 		}
 		if cipher == nil {
