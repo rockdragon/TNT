@@ -17,12 +17,13 @@ import (
 )
 
 const (
-	network    = "tcp"
-	laddr      = ":8088"
-	raddr      = ":10086"
-	password   = "$RGB&*()$RGN!@#$"
-	method     = "chacha20"
-	requestBuf = 269
+	network       = "tcp"
+	laddr         = ":8088"
+	raddr         = ":10086"
+	password      = "$RGB&*()$RGN!@#$"
+	method        = "chacha20"
+	requestBuf    = 269
+	queueCapacity = 16
 
 	socksVersion     = 5
 	layoutVer        = 0
@@ -192,7 +193,7 @@ func sendHTTPRequest(addr string, rawdata []byte) (conn net.Conn, err error) {
 
 // rountine of per connection
 // https://www.ietf.org/rfc/rfc1928.txt
-func handleConn(conn net.Conn, remote *tnt.Conn, cipher *tnt.Cipher) {
+func handleConn(conn net.Conn, remote *tnt.Conn, queue *tnt.Queue, cipher *tnt.Cipher) {
 	defer conn.Close()
 
 	// 1. extract info about negotiation
@@ -217,7 +218,8 @@ func handleConn(conn net.Conn, remote *tnt.Conn, cipher *tnt.Cipher) {
 	// 4. confirm the connection was established
 	replyRequest(conn, socksRequest)
 
-	// 5.TODO: convey message through one connection
+	// 5.TODO: stash request in queue & convey message through one connection
+
 	// go tnt.Pipe(conn, remote)
 	// tnt.Pipe(remote, conn)
 
@@ -235,6 +237,7 @@ func main() {
 	}
 	var cipher *tnt.Cipher
 	var remote *tnt.Conn
+	var queue *tnt.Queue
 
 	defer remote.Close()
 	for {
@@ -251,6 +254,9 @@ func main() {
 				continue
 			}
 		}
+		if queue == nil {
+			queue = tnt.NewQueue(queueCapacity)
+		}
 		if remote == nil || !tnt.Ping(remote) {
 			remote, err = tnt.ConnectToServer(network, raddr, cipher)
 			if err != nil {
@@ -259,6 +265,6 @@ func main() {
 			}
 		}
 
-		go handleConn(conn, remote, cipher.Copy())
+		go handleConn(conn, remote, queue, cipher.Copy())
 	}
 }
