@@ -6,20 +6,11 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const (
-	readTimeout = 120 * time.Second
-	maxNBuf     = 2048
-	requestBuf  = 269
+	maxNBuf = 2048
 )
-
-func setReadTimeout(c net.Conn) {
-	if readTimeout != 0 {
-		c.SetReadDeadline(time.Now().Add(readTimeout))
-	}
-}
 
 // Pipe ...
 func Pipe(src, dst net.Conn) {

@@ -191,10 +191,9 @@ func sendHTTPRequest(addr string, rawdata []byte) (conn net.Conn, err error) {
 }
 
 // rountine of per connection
+// https://www.ietf.org/rfc/rfc1928.txt
 func handleConn(conn net.Conn, remote *tnt.Conn, cipher *tnt.Cipher) {
 	defer conn.Close()
-
-	// https://www.ietf.org/rfc/rfc1928.txt
 
 	// 1. extract info about negotiation
 	socks, err := extractNeogotiation(conn)
@@ -218,16 +217,9 @@ func handleConn(conn net.Conn, remote *tnt.Conn, cipher *tnt.Cipher) {
 	// 4. confirm the connection was established
 	replyRequest(conn, socksRequest)
 
-	// 5. connect to remote
-	// remote, err := tnt.ConnectToServer(network, *serverAddr, socksRequest.RawAddr, cipher)
-	// if err != nil {
-	// 	log.Println("Connect to server failed", err)
-	// 	return
-	// }
-	// defer remote.Close()
-
-	go tnt.Pipe(conn, remote)
-	tnt.Pipe(remote, conn)
+	// 5.TODO: convey message through one connection
+	// go tnt.Pipe(conn, remote)
+	// tnt.Pipe(remote, conn)
 
 	return
 }
@@ -243,7 +235,6 @@ func main() {
 	}
 	var cipher *tnt.Cipher
 	var remote *tnt.Conn
-	// TODO: initial remote
 
 	defer remote.Close()
 	for {
@@ -257,6 +248,13 @@ func main() {
 			if err != nil {
 				log.Println("Generate Cipher Error", err)
 				conn.Close()
+				continue
+			}
+		}
+		if remote == nil || !tnt.Ping(remote) {
+			remote, err = tnt.ConnectToServer(network, raddr, cipher)
+			if err != nil {
+				log.Println("Connect Remote Error", err)
 				continue
 			}
 		}
