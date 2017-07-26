@@ -33,7 +33,7 @@ const (
 	layoutRSV        = 2
 	layoutATYP       = 3
 	layoutAddr       = 4
-	CONNECT          = 1
+	typeConnect      = 1
 
 	typeIPv4   = uint8(1)                // type is ipv4 address
 	typeDomain = uint8(3)                // type is domain address
@@ -112,7 +112,7 @@ func extractRequest(conn net.Conn) (socksReq *tnt.Socks5Request, err error) {
 		return
 	}
 	command := uint8(buf[layoutCommand])
-	if command != CONNECT {
+	if command != typeConnect {
 		err = errors.New("only CONNECT be able to accept")
 		return
 	}
