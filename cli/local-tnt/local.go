@@ -218,8 +218,11 @@ func handleConn(conn net.Conn, remote *tnt.Conn, queue *tnt.Queue, cipher *tnt.C
 	// 4. confirm the connection was established
 	replyRequest(conn, socksRequest)
 
-	// 5.TODO: stash request in queue & convey message through one connection
+	// 5.stash request in queue
+	request := tnt.NewTNTRequest(1, socksRequest.RawAddr)
+	queue.Push(request)
 
+	// 6.TODO: ticker events: convey message through one connection
 	// go tnt.Pipe(conn, remote)
 	// tnt.Pipe(remote, conn)
 

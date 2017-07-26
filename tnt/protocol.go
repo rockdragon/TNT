@@ -100,6 +100,15 @@ func (s *Socks5Request) String() string {
 	return buf.String()
 }
 
+func NewTNTRequest(tp uint8, rawaddr []byte) (r *TNTRequest) {
+	return &TNTRequest{
+		Type:    tp,
+		ID:      uuid.NewV1().Bytes(),
+		Length:  uint16(len(rawaddr)),
+		Payload: rawaddr,
+	}
+}
+
 func (r *TNTRequest) Bytes() []byte {
 	buf := new(bytes.Buffer)
 	buf.Write(r.ID)
