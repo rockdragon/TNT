@@ -70,16 +70,6 @@ func NewConn(c net.Conn, cipher *Cipher) *Conn {
 	}
 }
 
-// ConnectToServer one connction version
-func ConnectToServer(network, addr string, cipher *Cipher) (c *Conn, err error) {
-	conn, err := net.Dial(network, addr)
-	if err != nil {
-		return
-	}
-	c = NewConn(conn, cipher)
-	return
-}
-
 func (c *Conn) writeWithCipher(b []byte) (n int, err error) {
 	var iv []byte
 	if c.enc == nil {
@@ -115,5 +105,22 @@ func Ping(c net.Conn) (result bool) {
 		setReadTimeout(c)
 		result = true
 	}
+	return
+}
+
+func checkResponse(c *Conn) {
+
+}
+
+// ConnectToServer one connction version
+func ConnectToServer(network, addr string, cipher *Cipher) (c *Conn, err error) {
+	conn, err := net.Dial(network, addr)
+	if err != nil {
+		return
+	}
+	c = NewConn(conn, cipher)
+
+	go checkResponse(c)
+
 	return
 }

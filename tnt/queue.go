@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-var m *sync.RWMutex
+var queueLock *sync.RWMutex
 
 // Queue for generic purpose
 type Queue struct {
@@ -17,7 +17,7 @@ type Queue struct {
 }
 
 func NewQueue(capacity uint) (queue *Queue) {
-	m = new(sync.RWMutex)
+	queueLock = new(sync.RWMutex)
 	return &Queue{
 		queue:    make([]interface{}, capacity),
 		capacity: capacity,
@@ -28,7 +28,7 @@ func NewQueue(capacity uint) (queue *Queue) {
 }
 
 func (q *Queue) Push(elem interface{}) (err error) {
-	m.Lock()
+	queueLock.Lock()
 	if q.size == q.capacity {
 		err = errors.New("Queue is full")
 		return
@@ -36,12 +36,12 @@ func (q *Queue) Push(elem interface{}) (err error) {
 	q.queue = append(q.queue, elem)
 	q.size = uint(len(q.queue))
 	q.tail = q.size - 1
-	m.Unlock()
+	queueLock.Unlock()
 	return
 }
 
 func (q *Queue) Pop() (elem interface{}) {
-	m.Lock()
+	queueLock.Lock()
 	if q.size == 0 {
 		return nil
 	}
@@ -49,6 +49,6 @@ func (q *Queue) Pop() (elem interface{}) {
 	q.queue = q.queue[:q.tail]
 	q.size = uint(len(q.queue))
 	q.tail = q.size - 1
-	m.Unlock()
+	queueLock.Unlock()
 	return
 }

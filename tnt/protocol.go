@@ -27,11 +27,12 @@ type (
 		RawAddr         []byte
 	}
 
-	TNTRequest struct {
+	// Traffic represent traffic throughout c/s
+	Traffic struct {
 		Type    uint8     // 0: meaningless, 1: valid, other: invalid
 		ID      uuid.UUID // UUID identify a request, length:16
 		Length  uint16    // length of payload
-		Payload []byte
+		Payload []byte    // RawAddr
 	}
 )
 
@@ -98,16 +99,19 @@ func (s *Socks5Request) String() string {
 	return buf.String()
 }
 
-func NewTNTRequest(tp uint8, rawaddr []byte) (r *TNTRequest) {
-	return &TNTRequest{
+// NewTraffic payload stand for:
+// client: rawaddr
+// server: response bytes
+func NewTraffic(tp uint8, payload []byte) (r *Traffic) {
+	return &Traffic{
 		Type:    tp,
 		ID:      uuid.NewV1(),
-		Length:  uint16(len(rawaddr)),
-		Payload: rawaddr,
+		Length:  uint16(len(payload)),
+		Payload: payload,
 	}
 }
 
-func (r *TNTRequest) Bytes() []byte {
+func (r *Traffic) Bytes() []byte {
 	buf := new(bytes.Buffer)
 	buf.Write(r.ID.Bytes())
 	buf.WriteByte(r.Type)
@@ -116,8 +120,8 @@ func (r *TNTRequest) Bytes() []byte {
 	return buf.Bytes()
 }
 
-// UnMarshalRequest unmarshal TNTrequest via conn
-func UnMarshalRequest(conn io.Reader) (request *TNTRequest, err error) {
+// UnMarshalTraffic unmarshal TNTrequest via conn
+func UnMarshalTraffic(conn io.Reader) (request *Traffic, err error) {
 	buf := make([]byte, requestBuf)
 
 	if _, err = io.ReadFull(conn, buf[:layoutType+lenType]); err != nil {
@@ -147,7 +151,7 @@ func UnMarshalRequest(conn io.Reader) (request *TNTRequest, err error) {
 		return
 	}
 
-	request = new(TNTRequest)
+	request = new(Traffic)
 	request.Type = tp
 	request.ID = u1
 	request.Length = lenPayload
