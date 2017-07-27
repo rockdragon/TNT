@@ -45,6 +45,11 @@ const (
 
 var (
 	serverAddr = flag.String("s", raddr, "server addr")
+	taskQueue  = tnt.NewQueue(queueCapacity)
+	connQueue  = tnt.NewQueue(queueCapacity)
+	remote     *tnt.Conn
+	cipher     *tnt.Cipher
+	shutdown   chan struct{}
 )
 
 func init() {
@@ -191,10 +196,23 @@ func sendHTTPRequest(addr string, rawdata []byte) (conn net.Conn, err error) {
 	return
 }
 
+// convey message through one connection
+func eventLoop() {
+	ticker := time.NewTicker(1 * time.Second)
+
+	for {
+		select {
+		case <-ticker.C:
+		case <-shutdown:
+			break
+		}
+	}
+}
+
 // rountine of per connection
 // https://www.ietf.org/rfc/rfc1928.txt
 func handleConn(conn net.Conn, remote *tnt.Conn, queue *tnt.Queue, cipher *tnt.Cipher) {
-	defer conn.Close()
+	// defer conn.Close()
 
 	// 1. extract info about negotiation
 	socks, err := extractNeogotiation(conn)
@@ -220,11 +238,8 @@ func handleConn(conn net.Conn, remote *tnt.Conn, queue *tnt.Queue, cipher *tnt.C
 
 	// 5.stash request in queue
 	request := tnt.NewTNTRequest(1, socksRequest.RawAddr)
-	queue.Push(request)
-
-	// 6.TODO: ticker events: convey message through one connection
-	// go tnt.Pipe(conn, remote)
-	// tnt.Pipe(remote, conn)
+	taskQueue.Push(request)
+	connQueue.Push(conn)
 
 	return
 }
@@ -238,32 +253,31 @@ func main() {
 		log.Println("Listen Error", err)
 		os.Exit(1)
 	}
-	var cipher *tnt.Cipher
-	var remote *tnt.Conn
-	var queue *tnt.Queue
 
-	defer remote.Close()
+	cipher, err := tnt.NewCipher(method, password)
+	if err != nil {
+		log.Println("Generate Cipher Error", err)
+		os.Exit(1)
+	}
+
+	go eventLoop()
+
+	defer func() {
+		shutdown <- struct{}{} // kill eventloop
+		remote.Close()
+	}()
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			log.Printf("Accept Rrror: %v\n", err)
-			return
-		}
-		if cipher == nil {
-			cipher, err = tnt.NewCipher(method, password)
-			if err != nil {
-				log.Println("Generate Cipher Error", err)
-				conn.Close()
-				continue
-			}
-		}
-		if queue == nil {
-			queue = tnt.NewQueue(queueCapacity)
+			continue
 		}
 		if remote == nil || !tnt.Ping(remote) {
 			remote, err = tnt.ConnectToServer(network, raddr, cipher)
 			if err != nil {
 				log.Println("Connect Remote Error", err)
+				conn.Close()
 				continue
 			}
 		}

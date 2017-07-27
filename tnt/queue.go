@@ -1,6 +1,11 @@
 package tnt
 
-import "errors"
+import (
+	"errors"
+	"sync"
+)
+
+var m *sync.RWMutex
 
 // Queue for generic purpose
 type Queue struct {
@@ -11,29 +16,8 @@ type Queue struct {
 	size     uint
 }
 
-func (q *Queue) Push(elem interface{}) (err error) {
-	if q.size == q.capacity {
-		err = errors.New("Queue is full")
-		return
-	}
-	q.queue = append(q.queue, elem)
-	q.size = uint(len(q.queue))
-	q.tail = q.size - 1
-	return
-}
-
-func (q *Queue) Pop() (elem interface{}) {
-	if q.size == 0 {
-		return nil
-	}
-	elem = q.queue[q.tail]
-	q.queue = q.queue[:q.tail]
-	q.size = uint(len(q.queue))
-	q.tail = q.size - 1
-	return
-}
-
 func NewQueue(capacity uint) (queue *Queue) {
+	m = new(sync.RWMutex)
 	return &Queue{
 		queue:    make([]interface{}, capacity),
 		capacity: capacity,
@@ -41,4 +25,30 @@ func NewQueue(capacity uint) (queue *Queue) {
 		tail:     0,
 		size:     0,
 	}
+}
+
+func (q *Queue) Push(elem interface{}) (err error) {
+	m.Lock()
+	if q.size == q.capacity {
+		err = errors.New("Queue is full")
+		return
+	}
+	q.queue = append(q.queue, elem)
+	q.size = uint(len(q.queue))
+	q.tail = q.size - 1
+	m.Unlock()
+	return
+}
+
+func (q *Queue) Pop() (elem interface{}) {
+	m.Lock()
+	if q.size == 0 {
+		return nil
+	}
+	elem = q.queue[q.tail]
+	q.queue = q.queue[:q.tail]
+	q.size = uint(len(q.queue))
+	q.tail = q.size - 1
+	m.Unlock()
+	return
 }
