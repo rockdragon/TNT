@@ -28,9 +28,9 @@ type (
 	}
 
 	TNTRequest struct {
-		Type    uint8  // 0: meaningless, 1: valid, other: invalid
-		ID      []byte // UUID identify a request, length:16
-		Length  uint16 // length of payload
+		Type    uint8     // 0: meaningless, 1: valid, other: invalid
+		ID      uuid.UUID // UUID identify a request, length:16
+		Length  uint16    // length of payload
 		Payload []byte
 	}
 )
@@ -46,8 +46,6 @@ const (
 	lenPayload    = 255
 	requestBuf    = lenType + lenID + lenLength + lenPayload
 )
-
-var uuidValidator = uuid.UUID{}
 
 func methodMeaning(n uint8) (result string) {
 	switch n {
@@ -103,7 +101,7 @@ func (s *Socks5Request) String() string {
 func NewTNTRequest(tp uint8, rawaddr []byte) (r *TNTRequest) {
 	return &TNTRequest{
 		Type:    tp,
-		ID:      uuid.NewV1().Bytes(),
+		ID:      uuid.NewV1(),
 		Length:  uint16(len(rawaddr)),
 		Payload: rawaddr,
 	}
@@ -111,7 +109,7 @@ func NewTNTRequest(tp uint8, rawaddr []byte) (r *TNTRequest) {
 
 func (r *TNTRequest) Bytes() []byte {
 	buf := new(bytes.Buffer)
-	buf.Write(r.ID)
+	buf.Write(r.ID.Bytes())
 	buf.WriteByte(r.Type)
 	binary.Write(buf, binary.BigEndian, r.Length)
 	buf.Write(r.Payload)
@@ -134,8 +132,9 @@ func UnMarshalRequest(conn io.Reader) (request *TNTRequest, err error) {
 	if _, err = io.ReadFull(conn, buf[layoutID:layoutID+lenID]); err != nil {
 		return
 	}
+	u1 := uuid.UUID{}
 	id := buf[layoutID : layoutID+lenID]
-	if err = uuidValidator.Scan(id); err != nil { // is a valid UUID?
+	if err = u1.Scan(id); err != nil { // is a valid UUID?
 		return
 	}
 
@@ -150,7 +149,7 @@ func UnMarshalRequest(conn io.Reader) (request *TNTRequest, err error) {
 
 	request = new(TNTRequest)
 	request.Type = tp
-	request.ID = id
+	request.ID = u1
 	request.Length = lenPayload
 	request.Payload = buf[layoutPayload : layoutPayload+lenPayload]
 	return

@@ -46,7 +46,7 @@ const (
 var (
 	serverAddr = flag.String("s", raddr, "server addr")
 	taskQueue  = tnt.NewQueue(queueCapacity)
-	connQueue  = tnt.NewQueue(queueCapacity)
+	connMap    = make(map[string]*tnt.Conn, queueCapacity) //[uuid]conn
 	remote     *tnt.Conn
 	cipher     *tnt.Cipher
 	shutdown   chan struct{}
