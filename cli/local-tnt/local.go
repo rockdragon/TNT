@@ -46,7 +46,7 @@ const (
 var (
 	serverAddr = flag.String("s", raddr, "server addr")
 	taskQueue  = tnt.NewQueue(queueCapacity)
-	connMap    = make(map[string]*tnt.Conn, queueCapacity) //[uuid]conn
+	connMap    = make(map[string]net.Conn, queueCapacity) //[uuid]conn
 	remote     *tnt.Conn
 	cipher     *tnt.Cipher
 	shutdown   chan struct{}
@@ -211,7 +211,7 @@ func eventLoop() {
 
 // rountine of per connection
 // https://www.ietf.org/rfc/rfc1928.txt
-func handleConn(conn net.Conn, remote *tnt.Conn, queue *tnt.Queue, cipher *tnt.Cipher) {
+func handleConn(conn net.Conn, remote *tnt.Conn, cipher *tnt.Cipher) {
 	// defer conn.Close()
 
 	// 1. extract info about negotiation
@@ -236,10 +236,10 @@ func handleConn(conn net.Conn, remote *tnt.Conn, queue *tnt.Queue, cipher *tnt.C
 	// 4. confirm the connection was established
 	replyRequest(conn, socksRequest)
 
-	// 5.stash request in queue
+	// 5.stash request & conn
 	request := tnt.NewTNTRequest(1, socksRequest.RawAddr)
 	taskQueue.Push(request)
-	connQueue.Push(conn)
+	connMap[request.ID.String()] = conn
 
 	return
 }
@@ -282,6 +282,6 @@ func main() {
 			}
 		}
 
-		go handleConn(conn, remote, queue, cipher.Copy())
+		go handleConn(conn, remote, cipher.Copy())
 	}
 }
