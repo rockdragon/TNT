@@ -44,13 +44,13 @@ const (
 )
 
 var (
-	serverAddr = flag.String("s", raddr, "server addr")
-	taskQueue  = tnt.NewQueue(queueCapacity)
-	connMap    = tnt.NewConnMap(queueCapacity) //[uuid]conn
-	remote     *tnt.Conn
-	cipher     *tnt.Cipher
-	shutdown   chan struct{}
-	response   chan *tnt.Traffic
+	serverAddr   = flag.String("s", raddr, "server addr")
+	reuqestQueue = tnt.NewQueue(queueCapacity)
+	connMap      = tnt.NewConnMap(queueCapacity) //[uuid]conn
+	remote       *tnt.Conn
+	cipher       *tnt.Cipher
+	shutdown     chan struct{}
+	response     chan *tnt.Traffic
 )
 
 func init() {
@@ -208,11 +208,20 @@ func eventLoop() {
 			if ok {
 				connMap.Delete(traffic.ID)
 				if _, err := conn.Write(traffic.Payload); err != nil {
-					log.Println("[Write Traffic ERROR]", err)
+					log.Println("[Response Write Error]", err)
 				}
 				conn.Close()
 			}
+
 		case <-ticker.C:
+			req := reuqestQueue.Pop()
+			if req != nil {
+				traffic := req.(*tnt.Traffic)
+				if _, err := remote.Write(traffic.Bytes()); err != nil {
+					log.Println("[Request Write Error]", err)
+				}
+			}
+
 		case <-shutdown:
 			break
 		}
@@ -248,7 +257,7 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 
 	// 5.stash request & conn
 	request := tnt.NewTraffic(1, socksRequest.RawAddr)
-	taskQueue.Push(request)
+	reuqestQueue.Push(request)
 	connMap.Set(request.ID, conn)
 
 	return
