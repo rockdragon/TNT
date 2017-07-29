@@ -27,13 +27,22 @@ type (
 		RawAddr         []byte
 	}
 
+	// TrafficType 0: meaningless, 1: valid, other: invalid
+	TrafficType uint8
+
 	// Traffic represent traffic throughout c/s
 	Traffic struct {
-		Type    uint8     // 0: meaningless, 1: valid, other: invalid
+		Type    TrafficType
 		ID      uuid.UUID // UUID identify a request, length:16
 		Length  uint16    // length of payload
 		Payload []byte    // RawAddr
 	}
+)
+
+const (
+	Meaningless TrafficType = iota
+	Valid
+	Invalid
 )
 
 const (
@@ -102,7 +111,7 @@ func (s *Socks5Request) String() string {
 // NewTraffic payload stand for:
 // client: rawaddr
 // server: response bytes
-func NewTraffic(tp uint8, payload []byte) (r *Traffic) {
+func NewTraffic(tp TrafficType, payload []byte) (r *Traffic) {
 	return &Traffic{
 		Type:    tp,
 		ID:      uuid.NewV1(),
@@ -114,7 +123,7 @@ func NewTraffic(tp uint8, payload []byte) (r *Traffic) {
 func (r *Traffic) Bytes() []byte {
 	buf := new(bytes.Buffer)
 	buf.Write(r.ID.Bytes())
-	buf.WriteByte(r.Type)
+	buf.WriteByte(uint8(r.Type))
 	binary.Write(buf, binary.BigEndian, r.Length)
 	buf.Write(r.Payload)
 	return buf.Bytes()
@@ -152,7 +161,7 @@ func UnMarshalTraffic(conn io.Reader) (request *Traffic, err error) {
 	}
 
 	request = new(Traffic)
-	request.Type = tp
+	request.Type = TrafficType(tp)
 	request.ID = u1
 	request.Length = lenPayload
 	request.Payload = buf[layoutPayload : layoutPayload+lenPayload]

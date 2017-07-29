@@ -68,7 +68,7 @@ func reply(conn net.Conn, bytes []byte) (err error) {
 // |VER | NMETHODS | METHODS  |
 // +----+----------+----------+
 // | 1  |    1     | 1 to 255 |
-func extractNeogotiation(conn net.Conn) (socks *tnt.Socks5Negotiation, err error) {
+func extractNegotiation(conn net.Conn) (socks *tnt.Socks5Negotiation, err error) {
 	buf := make([]byte, requestBuf)
 
 	if _, err = io.ReadFull(conn, buf[:layoutNofMethods+1]); err != nil {
@@ -192,11 +192,6 @@ func replyRequest(conn net.Conn, socksRequest *tnt.Socks5Request) {
 	reply(conn, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x80, 0x88})
 }
 
-// TODO
-func sendHTTPRequest(addr string, rawdata []byte) (conn net.Conn, err error) {
-	return
-}
-
 // convey message through one connection
 func eventLoop() {
 	ticker := time.NewTicker(1 * time.Second)
@@ -234,9 +229,9 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	// defer conn.Close()
 
 	// 1. extract info about negotiation
-	socks, err := extractNeogotiation(conn)
+	socks, err := extractNegotiation(conn)
 	if err != nil {
-		log.Println("[Negotiate REQ Error]", err)
+		log.Println("[Negotiate Request Error]", err)
 		return
 	}
 	log.Println(socks)
@@ -247,7 +242,7 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	// 3. extract info about request
 	socksRequest, err := extractRequest(conn)
 	if err != nil {
-		log.Println("[Extract REQ Error]", err)
+		log.Println("[Extract Request Error]", err)
 		return
 	}
 	log.Println(socksRequest)
@@ -256,7 +251,7 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	replyRequest(conn, socksRequest)
 
 	// 5.stash request & conn
-	request := tnt.NewTraffic(1, socksRequest.RawAddr)
+	request := tnt.NewTraffic(tnt.Valid, socksRequest.RawAddr)
 	reuqestQueue.Push(request)
 	connMap.Set(request.ID, conn)
 
