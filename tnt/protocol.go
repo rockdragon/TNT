@@ -27,34 +27,36 @@ type (
 		RawAddr         []byte
 	}
 
-	// TrafficType 0: meaningless, 1: valid, other: invalid
+	// TrafficType 0: meaningless, 1: request, 2: response,  other: invalid
 	TrafficType uint8
 
 	// Traffic represent traffic throughout c/s
 	Traffic struct {
-		Type    TrafficType
-		ID      uuid.UUID // UUID identify a request, length:16
-		Length  uint16    // length of payload
-		Payload []byte    // RawAddr
+		Type       TrafficType
+		ID         uuid.UUID // UUID identify a request, length:16
+		AddrLen    uint16    // length of raw addr
+		Addr       []byte    // raw addr for request
+		PayloadLen uint32    // length of payload
+		Payload    []byte    // request/response data
 	}
 )
 
 const (
-	Meaningless TrafficType = iota
-	Valid
-	Invalid
+	TrafficMeaningless TrafficType = iota
+	TrafficRequest
+	TrafficResponse
 )
 
 const (
 	layoutType    = 0
 	layoutID      = 1
-	layoutLength  = 17
-	layoutPayload = 19
+	layoutAddrLen = 17
+	layoutAddr    = 19
 	lenType       = 1
 	lenID         = 16
-	lenLength     = 2
-	lenPayload    = 255
-	requestBuf    = lenType + lenID + lenLength + lenPayload
+	lenAddrLen    = 2
+	lenPayloadLen = 4
+	requestBuf    = 65535
 )
 
 func methodMeaning(n uint8) (result string) {
@@ -109,22 +111,25 @@ func (s *Socks5Request) String() string {
 }
 
 // NewTraffic payload stand for:
-// client: rawaddr
-// server: response bytes
-func NewTraffic(tp TrafficType, payload []byte) (r *Traffic) {
+// rawaddr + payload
+func NewTraffic(tp TrafficType, addr []byte, payload []byte) (r *Traffic) {
 	return &Traffic{
-		Type:    tp,
-		ID:      uuid.NewV1(),
-		Length:  uint16(len(payload)),
-		Payload: payload,
+		Type:       tp,
+		ID:         uuid.NewV1(),
+		AddrLen:    uint16(len(addr)),
+		Addr:       addr,
+		PayloadLen: uint32(len(payload)),
+		Payload:    payload,
 	}
 }
 
 func (r *Traffic) Bytes() []byte {
 	buf := new(bytes.Buffer)
-	buf.Write(r.ID.Bytes())
 	buf.WriteByte(uint8(r.Type))
-	binary.Write(buf, binary.BigEndian, r.Length)
+	buf.Write(r.ID.Bytes())
+	binary.Write(buf, binary.BigEndian, r.AddrLen)
+	buf.Write(r.Addr)
+	binary.Write(buf, binary.BigEndian, r.PayloadLen)
 	buf.Write(r.Payload)
 	return buf.Bytes()
 }
@@ -137,7 +142,7 @@ func UnMarshalTraffic(conn io.Reader) (request *Traffic, err error) {
 		return
 	}
 	tp := uint8(buf[layoutType])
-	if tp > 1 {
+	if tp > uint8(TrafficResponse) {
 		err = fmt.Errorf("Invalid request type: %v", tp)
 		return
 	}
@@ -151,19 +156,35 @@ func UnMarshalTraffic(conn io.Reader) (request *Traffic, err error) {
 		return
 	}
 
-	if _, err = io.ReadFull(conn, buf[layoutLength:layoutLength+lenLength]); err != nil {
+	if _, err = io.ReadFull(conn, buf[layoutAddrLen:layoutAddrLen+lenAddrLen]); err != nil {
 		return
 	}
-	lenPayload := binary.BigEndian.Uint16(buf[layoutLength : layoutLength+lenLength])
+	lenAddr := binary.BigEndian.Uint16(buf[layoutAddrLen : layoutAddrLen+lenAddrLen])
+
+	if _, err = io.ReadFull(conn, buf[layoutAddr:layoutAddr+lenAddr]); err != nil {
+		return
+	}
+	addr := buf[layoutAddr : layoutAddr+lenAddr]
+	layoutPayloadLen := layoutAddr + lenAddr
+
+	if _, err = io.ReadFull(conn, buf[layoutPayloadLen:layoutPayloadLen+lenPayloadLen]); err != nil {
+		return
+	}
+	lenPayload := binary.BigEndian.Uint32(buf[layoutPayloadLen : layoutPayloadLen+lenPayloadLen])
+	layoutPayload := uint32(layoutPayloadLen + lenPayloadLen)
 
 	if _, err = io.ReadFull(conn, buf[layoutPayload:layoutPayload+lenPayload]); err != nil {
 		return
 	}
+	payload := buf[layoutPayload : layoutPayload+lenPayload]
 
 	request = new(Traffic)
 	request.Type = TrafficType(tp)
 	request.ID = u1
-	request.Length = lenPayload
-	request.Payload = buf[layoutPayload : layoutPayload+lenPayload]
+	request.AddrLen = lenAddr
+	request.Addr = addr
+	request.PayloadLen = lenPayload
+	request.Payload = payload
+
 	return
 }

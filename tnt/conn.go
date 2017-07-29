@@ -108,10 +108,6 @@ func Ping(c net.Conn) (result bool) {
 	return
 }
 
-func checkResponse(c *Conn) {
-
-}
-
 // ConnectToServer one connction version
 func ConnectToServer(network, addr string, cipher *Cipher) (c *Conn, err error) {
 	conn, err := net.Dial(network, addr)
@@ -119,8 +115,6 @@ func ConnectToServer(network, addr string, cipher *Cipher) (c *Conn, err error) 
 		return
 	}
 	c = NewConn(conn, cipher)
-
-	go checkResponse(c)
 
 	return
 }

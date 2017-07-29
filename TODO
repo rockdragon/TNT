@@ -1,5 +1,3 @@
-1. send valid payload to remote periodically(ticker channel)
-2. all request multiplex one connection with server
-3. send meaningless data when idle
-4. check valid response, then trigger channel
-5. C/S exchange data through HTTP
+1. C/S use unique connection
+2. send meaningless data when idle
+3. C/S exchange data through HTTP

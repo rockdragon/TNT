@@ -23,6 +23,7 @@ const (
 	password      = "$RGB&*()$RGN!@#$"
 	method        = "chacha20"
 	requestBuf    = 269
+	maxNBuf       = 2048
 	queueCapacity = 16
 
 	socksVersion     = 5
@@ -196,6 +197,10 @@ func replyRequest(conn net.Conn, socksRequest *tnt.Socks5Request) {
 func eventLoop() {
 	ticker := time.NewTicker(1 * time.Second)
 
+	defer func() {
+		ticker.Stop()
+	}()
+
 	for {
 		select {
 		case traffic := <-response:
@@ -218,6 +223,24 @@ func eventLoop() {
 			}
 
 		case <-shutdown:
+			break
+		}
+	}
+}
+
+// check response from remote
+func checkResponse(remote *tnt.Conn) {
+	buf := make([]byte, maxNBuf)
+	for {
+		n, err := remote.Read(buf)
+		// log.Println("PIPE DATA: ", n, err)
+		if n > 0 {
+			if _, err = remote.Write(buf[0:n]); err != nil {
+				log.Println("[PIPE DATA ERROR]", err)
+				break
+			}
+		}
+		if err != nil {
 			break
 		}
 	}
@@ -251,7 +274,8 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	replyRequest(conn, socksRequest)
 
 	// 5.stash request & conn
-	request := tnt.NewTraffic(tnt.Valid, socksRequest.RawAddr)
+	payload := tnt.ReadStream(conn)
+	request := tnt.NewTraffic(tnt.TrafficRequest, payload.Bytes(), socksRequest.RawAddr)
 	reuqestQueue.Push(request)
 	connMap.Set(request.ID, conn)
 
@@ -294,6 +318,7 @@ func main() {
 				conn.Close()
 				continue
 			}
+			go checkResponse(remote)
 		}
 
 		go handleConn(conn, cipher.Copy())
