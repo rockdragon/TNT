@@ -27,6 +27,10 @@ func NewQueue(capacity uint) (queue *Queue) {
 	}
 }
 
+func (q *Queue) Size() uint {
+	return q.size
+}
+
 func (q *Queue) Push(elem interface{}) (err error) {
 	queueLock.Lock()
 	if q.size == q.capacity {

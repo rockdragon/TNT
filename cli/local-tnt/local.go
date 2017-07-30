@@ -24,7 +24,7 @@ const (
 	method        = "chacha20"
 	requestBuf    = 269
 	maxNBuf       = 2048
-	queueCapacity = 16
+	queueCapacity = 256
 
 	socksVersion     = 5
 	layoutVer        = 0
@@ -46,8 +46,9 @@ const (
 
 var (
 	serverAddr   = flag.String("s", raddr, "server addr")
-	reuqestQueue = tnt.NewQueue(queueCapacity)
+	requestQueue = tnt.NewQueue(queueCapacity)
 	cipher       *tnt.Cipher
+	shutdown     chan struct{}
 )
 
 func init() {
@@ -189,6 +190,24 @@ func replyRequest(conn net.Conn, socksRequest *tnt.Socks5Request) {
 	reply(conn, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x80, 0x88})
 }
 
+func eventLoop() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer func() {
+		ticker.Stop()
+	}()
+
+	for {
+		select {
+		case <-ticker.C:
+			if requestQueue.Size() == 0 {
+
+			}
+		case <-shutdown:
+			break
+		}
+	}
+}
+
 // rountine of per connection
 // https://www.ietf.org/rfc/rfc1928.txt
 func handleConn(conn net.Conn, cipher *tnt.Cipher) {
@@ -222,7 +241,11 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 		log.Println("Connect to server failed", err)
 		return
 	}
-	defer remote.Close()
+	requestQueue.Push(struct{}{})
+	defer func() {
+		requestQueue.Pop()
+		remote.Close()
+	}()
 
 	go tnt.Pipe(conn, remote)
 	tnt.Pipe(remote, conn)
@@ -245,6 +268,11 @@ func main() {
 		log.Println("Generate Cipher Error", err)
 		os.Exit(1)
 	}
+
+	go eventLoop()
+	defer func() {
+		shutdown <- struct{}{}
+	}()
 
 	for {
 		conn, err := ln.Accept()

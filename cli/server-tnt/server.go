@@ -66,7 +66,7 @@ func extractRequest(conn *tnt.Conn) (host string, err error) {
 }
 
 func handleConn(conn *tnt.Conn) {
-	// defer conn.Close()
+	defer conn.Close()
 
 	// 1. extract host info
 	host, err := extractRequest(conn)
