@@ -16,7 +16,7 @@ type Conn struct {
 }
 
 var (
-	readTimeout = 120 * time.Second
+	readTimeout = 6 * time.Minute
 	zeroByte    = make([]byte, 0)
 )
 
