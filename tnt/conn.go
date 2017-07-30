@@ -108,13 +108,18 @@ func Ping(c net.Conn) (result bool) {
 	return
 }
 
-// ConnectToServer one connction version
-func ConnectToServer(network, addr string, cipher *Cipher) (c *Conn, err error) {
+// ConnectToServer write rawaddr to server
+func ConnectToServer(network, addr string, rawaddr []byte, cipher *Cipher) (c *Conn, err error) {
 	conn, err := net.Dial(network, addr)
 	if err != nil {
 		return
 	}
 	c = NewConn(conn, cipher)
-
+	log.Println("[CONN]", len(rawaddr), rawaddr)
+	traffic := NewTraffic(TrafficRequest, rawaddr).Bytes()
+	if _, err = c.writeWithCipher(traffic); err != nil {
+		c.Close()
+		return nil, err
+	}
 	return
 }

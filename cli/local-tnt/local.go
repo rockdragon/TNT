@@ -47,11 +47,7 @@ const (
 var (
 	serverAddr   = flag.String("s", raddr, "server addr")
 	reuqestQueue = tnt.NewQueue(queueCapacity)
-	connMap      = tnt.NewConnMap(queueCapacity) //[uuid]conn
-	remote       *tnt.Conn
 	cipher       *tnt.Cipher
-	shutdown     chan struct{}
-	response     chan *tnt.Traffic
 )
 
 func init() {
@@ -193,63 +189,10 @@ func replyRequest(conn net.Conn, socksRequest *tnt.Socks5Request) {
 	reply(conn, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x80, 0x88})
 }
 
-// convey message through one connection
-func eventLoop() {
-	ticker := time.NewTicker(1 * time.Second)
-
-	defer func() {
-		ticker.Stop()
-	}()
-
-	for {
-		select {
-		case traffic := <-response:
-			conn, ok := connMap.Get(traffic.ID)
-			if ok {
-				connMap.Delete(traffic.ID)
-				if _, err := conn.Write(traffic.Payload); err != nil {
-					log.Println("[Response Write Error]", err)
-				}
-				conn.Close()
-			}
-
-		case <-ticker.C:
-			req := reuqestQueue.Pop()
-			if req != nil {
-				traffic := req.(*tnt.Traffic)
-				if _, err := remote.Write(traffic.Bytes()); err != nil {
-					log.Println("[Request Write Error]", err)
-				}
-			}
-
-		case <-shutdown:
-			break
-		}
-	}
-}
-
-// check response from remote
-func checkResponse(remote *tnt.Conn) {
-	buf := make([]byte, maxNBuf)
-	for {
-		n, err := remote.Read(buf)
-		// log.Println("PIPE DATA: ", n, err)
-		if n > 0 {
-			if _, err = remote.Write(buf[0:n]); err != nil {
-				log.Println("[PIPE DATA ERROR]", err)
-				break
-			}
-		}
-		if err != nil {
-			break
-		}
-	}
-}
-
 // rountine of per connection
 // https://www.ietf.org/rfc/rfc1928.txt
 func handleConn(conn net.Conn, cipher *tnt.Cipher) {
-	// defer conn.Close()
+	defer conn.Close()
 
 	// 1. extract info about negotiation
 	socks, err := extractNegotiation(conn)
@@ -273,11 +216,16 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	// 4. confirm the connection was established
 	replyRequest(conn, socksRequest)
 
-	// 5.stash request & conn
-	payload := tnt.ReadStream(conn)
-	request := tnt.NewTraffic(tnt.TrafficRequest, payload.Bytes(), socksRequest.RawAddr)
-	reuqestQueue.Push(request)
-	connMap.Set(request.ID, conn)
+	// 5. connect to remote
+	remote, err := tnt.ConnectToServer(network, *serverAddr, socksRequest.RawAddr, cipher)
+	if err != nil {
+		log.Println("Connect to server failed", err)
+		return
+	}
+	defer remote.Close()
+
+	go tnt.Pipe(conn, remote)
+	tnt.Pipe(remote, conn)
 
 	return
 }
@@ -298,27 +246,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	go eventLoop()
-
-	defer func() {
-		shutdown <- struct{}{} // kill eventloop
-		remote.Close()
-	}()
-
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			log.Printf("Accept Rrror: %v\n", err)
 			continue
-		}
-		if remote == nil || !tnt.Ping(remote) {
-			remote, err = tnt.ConnectToServer(network, raddr, cipher)
-			if err != nil {
-				log.Println("Connect Remote Error", err)
-				conn.Close()
-				continue
-			}
-			go checkResponse(remote)
 		}
 
 		go handleConn(conn, cipher.Copy())

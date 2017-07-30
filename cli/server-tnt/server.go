@@ -34,31 +34,25 @@ const (
 func extractRequest(conn *tnt.Conn) (host string, err error) {
 	conn.SetReadTimeout()
 
-	buf := make([]byte, requestBuf)
-	if _, err = io.ReadFull(conn, buf[:layoutATYP+1]); err != nil {
+	traffic, err := tnt.UnMarshalTraffic(conn)
+	if err != nil {
 		return
 	}
+
+	log.Println("[Traffic Length]", traffic.PayloadLen)
+	buf := traffic.Payload
 	ATYP := uint8(buf[layoutATYP])
 	var address string
 	var addrEnd int
 
 	switch ATYP {
 	case typeIPv4:
-		if _, err = io.ReadFull(conn, buf[layoutAddr:layoutAddr+lenIPv4]); err != nil {
-			return
-		}
 		addrEnd = layoutAddr + lenIPv4
 		address = net.IP(buf[layoutAddr:addrEnd]).String()
 	case typeIPv6:
-		if _, err = io.ReadFull(conn, buf[layoutAddr:layoutAddr+lenIPv6]); err != nil {
-			return
-		}
 		addrEnd = layoutAddr + lenIPv6
 		address = net.IP(buf[layoutAddr:addrEnd]).String()
 	case typeDomain:
-		if _, err = io.ReadFull(conn, buf[layoutAddr:layoutAddr+1]); err != nil {
-			return
-		}
 		addrLen := int(buf[layoutAddr])
 		addrEnd = layoutAddr + 1 + addrLen
 		if _, err = io.ReadFull(conn, buf[layoutAddr+1:addrEnd]); err != nil {
@@ -67,10 +61,6 @@ func extractRequest(conn *tnt.Conn) (host string, err error) {
 		address = string(buf[layoutAddr+1 : addrEnd])
 	default:
 		err = fmt.Errorf("address type is Unknown: %d", ATYP)
-		return
-	}
-
-	if _, err = io.ReadFull(conn, buf[addrEnd:addrEnd+2]); err != nil {
 		return
 	}
 
