@@ -39,7 +39,7 @@ func extractRequest(conn *tnt.Conn) (host string, err error) {
 		return
 	}
 
-	log.Println("[Traffic Length]", traffic.PayloadLen)
+	log.Println("[Traffic]", traffic)
 	buf := traffic.Payload
 	ATYP := uint8(buf[layoutATYP])
 	var address string
