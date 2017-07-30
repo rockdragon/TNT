@@ -31,7 +31,7 @@ type (
 	// Traffic represent traffic throughout c/s
 	Traffic struct {
 		Type       TrafficType
-		PayloadLen uint32 // length of payload
+		PayloadLen uint16 // length of payload
 		Payload    []byte // rawaddr
 	}
 )
@@ -44,9 +44,9 @@ const (
 const (
 	layoutType       = 0
 	layoutPayloadLen = 1
-	layoutPayload    = 5
+	layoutPayload    = 3
 	lenType          = 1
-	lenPayloadLen    = 4
+	lenPayloadLen    = 2
 	requestBuf       = 269
 )
 
@@ -106,7 +106,7 @@ func (s *Socks5Request) String() string {
 func NewTraffic(tp TrafficType, payload []byte) (r *Traffic) {
 	return &Traffic{
 		Type:       tp,
-		PayloadLen: uint32(len(payload)),
+		PayloadLen: uint16(len(payload)),
 		Payload:    payload,
 	}
 }
@@ -135,7 +135,7 @@ func UnMarshalTraffic(conn io.Reader) (request *Traffic, err error) {
 	if _, err = io.ReadFull(conn, buf[layoutPayloadLen:layoutPayloadLen+lenPayloadLen]); err != nil {
 		return
 	}
-	lenPayload := binary.BigEndian.Uint32(buf[layoutPayloadLen : layoutPayloadLen+lenPayloadLen])
+	lenPayload := binary.BigEndian.Uint16(buf[layoutPayloadLen : layoutPayloadLen+lenPayloadLen])
 
 	if _, err = io.ReadFull(conn, buf[layoutPayload:layoutPayload+lenPayload]); err != nil {
 		return
