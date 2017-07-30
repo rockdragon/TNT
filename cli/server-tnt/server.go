@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -55,9 +54,6 @@ func extractRequest(conn *tnt.Conn) (host string, err error) {
 	case typeDomain:
 		addrLen := int(buf[layoutAddr])
 		addrEnd = layoutAddr + 1 + addrLen
-		if _, err = io.ReadFull(conn, buf[layoutAddr+1:addrEnd]); err != nil {
-			return
-		}
 		address = string(buf[layoutAddr+1 : addrEnd])
 	default:
 		err = fmt.Errorf("address type is Unknown: %d", ATYP)
