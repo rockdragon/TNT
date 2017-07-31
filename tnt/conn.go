@@ -45,6 +45,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	if n > 0 {
 		c.decrypt(b[:n], buf[:n])
 		// log.Printf("[DEC] %d %v -> %v [IV] %v \n", n, buf[:n], b[:n], c.iv)
+		log.Printf("[READ] %d bytes\n", n)
 	}
 	return
 }
@@ -86,7 +87,8 @@ func (c *Conn) writeWithCipher(b []byte) (n int, err error) {
 	}
 	c.encrypt(buf[len(iv):], b)
 	n, err = c.Conn.Write(buf)
-	log.Printf("[write] %v -> %v [iv] %v\n", b, buf, iv)
+	// log.Printf("[write] %v -> %v [iv] %v\n", b, buf, iv)
+	log.Printf("[WRITE] %d bytes\n", n)
 	return
 }
 

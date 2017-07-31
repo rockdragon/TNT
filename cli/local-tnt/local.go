@@ -195,6 +195,23 @@ func replyRequest(conn net.Conn, socksRequest *tnt.Socks5Request) {
 	reply(conn, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x80, 0x88})
 }
 
+func sendMeaninglessPayload(cipher *tnt.Cipher) {
+	remote, err := tnt.ConnectToServer(network, *serverAddr,
+		tnt.TrafficMeaningless, rawAddr, cipher)
+	if err != nil {
+		log.Println("Connect to target server failed", err)
+		return
+	}
+	requestQueue.Push(struct{}{})
+	defer func() {
+		requestQueue.Pop()
+		remote.Close()
+	}()
+
+	go tnt.Pour(remote, httpHeader)
+	tnt.Drain(remote)
+}
+
 func eventLoop(cipher *tnt.Cipher) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer func() {
@@ -204,36 +221,14 @@ func eventLoop(cipher *tnt.Cipher) {
 	for {
 		select {
 		case <-ticker.C:
+			// log.Println("[TICKER]", requestQueue.Size())
 			if requestQueue.Size() == 0 {
-				remote, err := requestTarget(tnt.TrafficMeaningless, rawAddr, cipher.Copy())
-				if err != nil {
-					log.Println("[Request Target Error]", err)
-					return
-				}
-
-				go tnt.Pour(remote, httpHeader)
-				tnt.Drain(remote)
+				sendMeaninglessPayload(cipher.Copy())
 			}
 		case <-shutdown:
 			break
 		}
 	}
-}
-
-func requestTarget(tp tnt.TrafficType, payload []byte,
-	cipher *tnt.Cipher) (target *tnt.Conn, err error) {
-	target, err = tnt.ConnectToServer(network, *serverAddr, tp, payload, cipher)
-	if err != nil {
-		log.Println("Connect to target server failed", err)
-		return
-	}
-	requestQueue.Push(struct{}{})
-	defer func() {
-		requestQueue.Pop()
-		target.Close()
-	}()
-
-	return
 }
 
 // rountine of per connection
@@ -264,11 +259,17 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	replyRequest(conn, socksRequest)
 
 	// 5. connect to remote
-	remote, err := requestTarget(tnt.TrafficRequest, socksRequest.RawAddr, cipher)
+	remote, err := tnt.ConnectToServer(network, *serverAddr,
+		tnt.TrafficRequest, socksRequest.RawAddr, cipher)
 	if err != nil {
-		log.Println("[Request Target Error]", err)
+		log.Println("Connect to target server failed", err)
 		return
 	}
+	requestQueue.Push(struct{}{})
+	defer func() {
+		requestQueue.Pop()
+		remote.Close()
+	}()
 
 	go tnt.Pipe(conn, remote)
 	tnt.Pipe(remote, conn)

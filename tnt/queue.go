@@ -19,7 +19,7 @@ type Queue struct {
 func NewQueue(capacity uint) (queue *Queue) {
 	queueLock = new(sync.RWMutex)
 	return &Queue{
-		queue:    make([]interface{}, capacity),
+		queue:    make([]interface{}, 0, capacity),
 		capacity: capacity,
 		head:     0,
 		tail:     0,
@@ -27,12 +27,16 @@ func NewQueue(capacity uint) (queue *Queue) {
 	}
 }
 
-func (q *Queue) Size() uint {
-	return q.size
+func (q *Queue) Size() (size uint) {
+	queueLock.RLock()
+	size = q.size
+	queueLock.RUnlock()
+	return
 }
 
 func (q *Queue) Push(elem interface{}) (err error) {
 	queueLock.Lock()
+	// log.Println("Push")
 	if q.size == q.capacity {
 		err = errors.New("Queue is full")
 		return
@@ -46,6 +50,7 @@ func (q *Queue) Push(elem interface{}) (err error) {
 
 func (q *Queue) Pop() (elem interface{}) {
 	queueLock.Lock()
+	// log.Println("Pop")
 	if q.size == 0 {
 		return nil
 	}
