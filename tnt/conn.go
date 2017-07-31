@@ -27,7 +27,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	defer HandlePanic()
 
 	if c.dec == nil {
-		log.Println("no dec, auto gen a dec.")
+		// log.Println("no dec, auto gen a dec.")
 		iv := make([]byte, c.info.ivLen)
 		if _, err = io.ReadFull(c.Conn, iv); err != nil {
 			return
@@ -44,7 +44,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	n, err = c.Conn.Read(buf)
 	if n > 0 {
 		c.decrypt(b[:n], buf[:n])
-		log.Printf("[DEC] %d %v -> %v [IV] %v \n", n, buf[:n], b[:n], c.iv)
+		// log.Printf("[DEC] %d %v -> %v [IV] %v \n", n, buf[:n], b[:n], c.iv)
 	}
 	return
 }
@@ -109,14 +109,14 @@ func Ping(c net.Conn) (result bool) {
 }
 
 // ConnectToServer write rawaddr to server
-func ConnectToServer(network, addr string, rawaddr []byte, cipher *Cipher) (c *Conn, err error) {
+func ConnectToServer(network, addr string, tp TrafficType, rawaddr []byte, cipher *Cipher) (c *Conn, err error) {
 	conn, err := net.Dial(network, addr)
 	if err != nil {
 		return
 	}
 	c = NewConn(conn, cipher)
 	log.Println("[CONN]", len(rawaddr), rawaddr)
-	traffic := NewTraffic(TrafficRequest, rawaddr).Bytes()
+	traffic := NewTraffic(tp, rawaddr).Bytes()
 	if _, err = c.writeWithCipher(traffic); err != nil {
 		c.Close()
 		return nil, err

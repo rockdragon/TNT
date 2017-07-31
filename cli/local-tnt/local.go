@@ -42,6 +42,9 @@ const (
 	lenIPv4    = 3 + 1 + net.IPv4len + 2 // 3(ver+cmd+rsv) + 1addrType + ipv4 + 2port
 	lenIPv6    = 3 + 1 + net.IPv6len + 2 // 3(ver+cmd+rsv) + 1addrType + ipv6 + 2port
 	lenDmBase  = 3 + 1 + 1 + 2           // 3 + 1addrType + 1addrLen + 2port, plus addrLen
+
+	targetDomain = "example.org"
+	targetPort   = 80
 )
 
 var (
@@ -49,6 +52,8 @@ var (
 	requestQueue = tnt.NewQueue(queueCapacity)
 	cipher       *tnt.Cipher
 	shutdown     chan struct{}
+	rawAddr      = tnt.RawAddr(targetDomain, targetPort)
+	httpHeader   = tnt.HTTPProtocolHeader(targetDomain)
 )
 
 func init() {
@@ -190,7 +195,7 @@ func replyRequest(conn net.Conn, socksRequest *tnt.Socks5Request) {
 	reply(conn, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x80, 0x88})
 }
 
-func eventLoop() {
+func eventLoop(cipher *tnt.Cipher) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer func() {
 		ticker.Stop()
@@ -200,12 +205,35 @@ func eventLoop() {
 		select {
 		case <-ticker.C:
 			if requestQueue.Size() == 0 {
+				remote, err := requestTarget(tnt.TrafficMeaningless, rawAddr, cipher.Copy())
+				if err != nil {
+					log.Println("[Request Target Error]", err)
+					return
+				}
 
+				go tnt.Pour(remote, httpHeader)
+				tnt.Drain(remote)
 			}
 		case <-shutdown:
 			break
 		}
 	}
+}
+
+func requestTarget(tp tnt.TrafficType, payload []byte,
+	cipher *tnt.Cipher) (target *tnt.Conn, err error) {
+	target, err = tnt.ConnectToServer(network, *serverAddr, tp, payload, cipher)
+	if err != nil {
+		log.Println("Connect to target server failed", err)
+		return
+	}
+	requestQueue.Push(struct{}{})
+	defer func() {
+		requestQueue.Pop()
+		target.Close()
+	}()
+
+	return
 }
 
 // rountine of per connection
@@ -236,16 +264,11 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	replyRequest(conn, socksRequest)
 
 	// 5. connect to remote
-	remote, err := tnt.ConnectToServer(network, *serverAddr, socksRequest.RawAddr, cipher)
+	remote, err := requestTarget(tnt.TrafficRequest, socksRequest.RawAddr, cipher)
 	if err != nil {
-		log.Println("Connect to server failed", err)
+		log.Println("[Request Target Error]", err)
 		return
 	}
-	requestQueue.Push(struct{}{})
-	defer func() {
-		requestQueue.Pop()
-		remote.Close()
-	}()
 
 	go tnt.Pipe(conn, remote)
 	tnt.Pipe(remote, conn)
@@ -269,7 +292,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	go eventLoop()
+	go eventLoop(cipher)
 	defer func() {
 		shutdown <- struct{}{}
 	}()

@@ -2,9 +2,9 @@ package tnt
 
 import (
 	"bytes"
+	"encoding/binary"
 	"log"
 	"net"
-	"strconv"
 	"strings"
 )
 
@@ -50,22 +50,39 @@ func ReadStream(conn net.Conn) *bytes.Buffer {
 	return result
 }
 
-// HTTPProtocolHeader ...
-func HTTPProtocolHeader(domain string) string {
-	return strings.Join([]string{"GET / HTTP/1.1\r\n",
-		"Host: " + domain + "\r\n",
-		"Connection: Close\r\n",
-		"User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6)\r\n\r\n"}, "")
+// Drain stream
+func Drain(conn net.Conn) {
+	buf := make([]byte, maxNBuf)
+	for {
+		setReadTimeout(conn)
+		_, err := conn.Read(buf)
+		if err != nil {
+			break
+		}
+	}
 }
 
-// ConnectWithHTTP ...
-func ConnectWithHTTP(domain string, port int) (remote net.Conn, err error) {
-	remote, err = net.Dial("tcp", domain+":"+strconv.Itoa(port))
-	if err != nil {
-		return
+// Pour stream
+func Pour(conn net.Conn, data []byte) {
+	if _, err := conn.Write(data); err != nil {
+		log.Println("[Pour data error]", err)
 	}
+}
 
-	_, err = remote.Write([]byte(HTTPProtocolHeader(domain)))
+// HTTPProtocolHeader ...
+func HTTPProtocolHeader(domain string) []byte {
+	return []byte(strings.Join([]string{"GET / HTTP/1.1\r\n",
+		"Host: " + domain + "\r\n",
+		"Connection: Close\r\n",
+		"User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6)\r\n\r\n"}, ""))
+}
 
-	return
+// RawAddr according to domain and port
+func RawAddr(domain string, port uint16) []byte {
+	buf := new(bytes.Buffer)
+	buf.WriteByte(uint8(3))
+	buf.WriteByte(uint8(len(domain)))
+	buf.Write([]byte(domain))
+	binary.Write(buf, binary.BigEndian, port)
+	return buf.Bytes()
 }
