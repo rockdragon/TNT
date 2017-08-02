@@ -1,0 +1,9 @@
+{
+  "local": ":8088",
+  "server": ":10086",
+  "password": "$RGB&*()$RGN!@#$",
+  "method": "chacha20",
+  "timeout": 120,
+  "target_domain": "example.org",
+  "target_port": 80
+}

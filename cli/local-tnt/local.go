@@ -18,10 +18,6 @@ import (
 
 const (
 	network       = "tcp"
-	laddr         = ":8088"
-	raddr         = ":10086"
-	password      = "$RGB&*()$RGN!@#$"
-	method        = "chacha20"
 	requestBuf    = 269
 	maxNBuf       = 2048
 	queueCapacity = 256
@@ -42,18 +38,16 @@ const (
 	lenIPv4    = 3 + 1 + net.IPv4len + 2 // 3(ver+cmd+rsv) + 1addrType + ipv4 + 2port
 	lenIPv6    = 3 + 1 + net.IPv6len + 2 // 3(ver+cmd+rsv) + 1addrType + ipv6 + 2port
 	lenDmBase  = 3 + 1 + 1 + 2           // 3 + 1addrType + 1addrLen + 2port, plus addrLen
-
-	targetDomain = "example.org"
-	targetPort   = 80
 )
 
 var (
-	serverAddr   = flag.String("s", raddr, "server addr")
+	rawAddr      []byte
+	httpHeader   []byte
 	requestQueue = tnt.NewQueue(queueCapacity)
+	config       *tnt.Config
+	errNS        error
 	cipher       *tnt.Cipher
 	shutdown     chan struct{}
-	rawAddr      = tnt.RawAddr(targetDomain, targetPort)
-	httpHeader   = tnt.HTTPProtocolHeader(targetDomain)
 )
 
 func init() {
@@ -196,7 +190,7 @@ func replyRequest(conn net.Conn, socksRequest *tnt.Socks5Request) {
 }
 
 func sendMeaninglessPayload(cipher *tnt.Cipher) {
-	remote, err := tnt.ConnectToServer(network, *serverAddr,
+	remote, err := tnt.ConnectToServer(network, config.ServerAddr,
 		tnt.TrafficMeaningless, rawAddr, cipher)
 	if err != nil {
 		log.Println("Connect to target server failed", err)
@@ -259,7 +253,7 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 	replyRequest(conn, socksRequest)
 
 	// 5. connect to remote
-	remote, err := tnt.ConnectToServer(network, *serverAddr,
+	remote, err := tnt.ConnectToServer(network, config.ServerAddr,
 		tnt.TrafficRequest, socksRequest.RawAddr, cipher)
 	if err != nil {
 		log.Println("Connect to target server failed", err)
@@ -278,16 +272,27 @@ func handleConn(conn net.Conn, cipher *tnt.Cipher) {
 }
 
 func main() {
+	cfgfile := flag.String("c", "config.json", "config file path")
 	flag.Parse()
 
-	log.Println("Server is Listening:", network, laddr)
-	ln, err := net.Listen(network, laddr)
+	config, errNS = tnt.ParseConfig(*cfgfile)
+	if errNS != nil {
+		log.Println("Config Parse Error", errNS)
+		os.Exit(1)
+	}
+	log.Println("[CONF]", config)
+
+	rawAddr = tnt.RawAddr(config.TargetDomain, config.TargetPort)
+	httpHeader = tnt.HTTPProtocolHeader(config.TargetDomain)
+
+	log.Println("Server is Listening:", network, config.LocalAddr)
+	ln, err := net.Listen(network, config.LocalAddr)
 	if err != nil {
 		log.Println("Listen Error", err)
 		os.Exit(1)
 	}
 
-	cipher, err := tnt.NewCipher(method, password)
+	cipher, err := tnt.NewCipher(config.Method, config.Password)
 	if err != nil {
 		log.Println("Generate Cipher Error", err)
 		os.Exit(1)

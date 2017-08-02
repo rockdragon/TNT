@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -13,9 +14,6 @@ import (
 
 const (
 	network    = "tcp"
-	raddr      = ":10086"
-	password   = "$RGB&*()$RGN!@#$"
-	method     = "chacha20"
 	requestBuf = 269
 
 	layoutATYP = 0
@@ -28,6 +26,11 @@ const (
 	lenIPv4    = 3 + 1 + net.IPv4len + 2 // 3(ver+cmd+rsv) + 1addrType + ipv4 + 2port
 	lenIPv6    = 3 + 1 + net.IPv6len + 2 // 3(ver+cmd+rsv) + 1addrType + ipv6 + 2port
 	lenDmBase  = 3 + 1 + 1 + 2           // 3 + 1addrType + 1addrLen + 2port, plus addrLen
+)
+
+var (
+	config *tnt.Config
+	errNS  error
 )
 
 func extractRequest(conn *tnt.Conn) (host string, err error) {
@@ -89,8 +92,18 @@ func handleConn(conn *tnt.Conn) {
 }
 
 func main() {
-	log.Println("Server is Listening:", network, raddr)
-	ln, err := net.Listen(network, raddr)
+	cfgfile := flag.String("c", "config.json", "config file path")
+	flag.Parse()
+
+	config, errNS = tnt.ParseConfig(*cfgfile)
+	if errNS != nil {
+		log.Println("Config Parse Error", errNS)
+		os.Exit(1)
+	}
+	log.Println("[CONF]", config)
+
+	log.Println("Server is Listening:", network, config.ServerAddr)
+	ln, err := net.Listen(network, config.ServerAddr)
 	if err != nil {
 		log.Println("Listen Error", err)
 		os.Exit(1)
@@ -103,7 +116,7 @@ func main() {
 			return
 		}
 		if cipher == nil {
-			cipher, err = tnt.NewCipher(method, password)
+			cipher, err = tnt.NewCipher(config.Method, config.Password)
 			if err != nil {
 				log.Println("Generate Cipher Error", err)
 				conn.Close()

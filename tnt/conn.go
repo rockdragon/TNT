@@ -16,8 +16,7 @@ type Conn struct {
 }
 
 var (
-	readTimeout = 6 * time.Minute
-	zeroByte    = make([]byte, 0)
+	zeroByte = make([]byte, 0)
 )
 
 func (c *Conn) Close() error {
@@ -55,9 +54,10 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 }
 
 func setReadTimeout(c net.Conn) {
-	if readTimeout != 0 {
-		c.SetReadDeadline(time.Now().Add(readTimeout))
+	if ReadTimeout == 0 {
+		ReadTimeout = 120 * time.Second
 	}
+	c.SetReadDeadline(time.Now().Add(ReadTimeout))
 }
 func (c *Conn) SetReadTimeout() {
 	setReadTimeout(c.Conn)
