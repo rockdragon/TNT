@@ -25,5 +25,5 @@ go run cli/server-tnt/server.go -c cli/config-example/config.json
 * password: password used by both ends
 * method: cipher method
 * timeout: network timeout
-* target_domain: domain of fake traffic (only used by local)
-* target_port: port of fake traffic (only used by local)
+* target_domain: domain of fake traffic
+* target_port: port of fake traffic
