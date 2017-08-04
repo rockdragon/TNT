@@ -4,14 +4,14 @@ a experimental proxy
 ## client
 usage:
 ```
-go run cli/local-tnt/local.go -c cli/config-example/
+go run cli/local-tnt/local.go -c cli/config-example/config.json
 ```
 
 
 ## server
 usage:
 ```
-go run cli/server-tnt/server.go -c cli/config-example/
+go run cli/server-tnt/server.go -c cli/config-example/config.json
 ```
 
 ## configuration
