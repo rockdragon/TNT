@@ -1,5 +1,5 @@
 # TNT
-a experimental proxy
+an experimental proxy
 
 ## client
 usage:
