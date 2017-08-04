@@ -5,9 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
+	"time"
 
 	tnt "github.com/rockdragon/TNT/tnt"
 )
@@ -29,9 +31,14 @@ const (
 )
 
 var (
-	config *tnt.Config
-	errNS  error
+	config     *tnt.Config
+	errNS      error
+	presetAddr string
 )
+
+func init() {
+	rand.Seed(time.Now().Unix())
+}
 
 func extractRequest(conn *tnt.Conn) (host string, err error) {
 	conn.SetReadTimeout()
@@ -68,6 +75,18 @@ func extractRequest(conn *tnt.Conn) (host string, err error) {
 	return
 }
 
+func respondWithHTTP(conn *tnt.Conn) {
+	remote, err := net.Dial(network, presetAddr)
+	if err != nil {
+		log.Println("Request Remote Error", err)
+		return
+	}
+	defer remote.Close()
+
+	go tnt.Pipe(conn, remote)
+	tnt.Pipe(remote, conn)
+}
+
 func handleConn(conn *tnt.Conn) {
 	defer conn.Close()
 
@@ -75,6 +94,7 @@ func handleConn(conn *tnt.Conn) {
 	host, err := extractRequest(conn)
 	if err != nil {
 		log.Println("Extract Request Error", err)
+		respondWithHTTP(conn)
 		return
 	}
 	log.Println("[HOST]", host)
@@ -83,6 +103,7 @@ func handleConn(conn *tnt.Conn) {
 	remote, err := net.Dial(network, host)
 	if err != nil {
 		log.Println("Request Remote Error", err)
+		respondWithHTTP(conn)
 		return
 	}
 	defer remote.Close()
@@ -101,6 +122,8 @@ func main() {
 		os.Exit(1)
 	}
 	log.Println("[CONF]", config)
+
+	presetAddr = net.JoinHostPort(config.TargetDomain, strconv.Itoa(int(config.TargetPort)))
 
 	log.Println("Server is Listening:", network, config.ServerAddr)
 	ln, err := net.Listen(network, config.ServerAddr)
