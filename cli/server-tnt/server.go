@@ -135,7 +135,7 @@ func main() {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Printf("Accept Rrror: %v\n", err)
+			log.Printf("Accept Error: %v\n", err)
 			return
 		}
 		if cipher == nil {
